@@ -9,9 +9,9 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	pb_common "base-station/protobuf/generated/go/common"
-	pb_node "base-station/protobuf/generated/go/metrics"
-	pb_pump "base-station/protobuf/generated/go/pump"
+	pb_common "base-station/protobuf/generated/go"
+	pb_node "base-station/protobuf/generated/go/node"
+	pb_column "base-station/protobuf/generated/go/column"
 	"io"
 
 	"net/http"
@@ -63,7 +63,7 @@ func ProcessMessage(reader io.Reader, buf [1024]byte) error {
 	// TODO but in a switch statement on msg type
 	switch *header.Channel {
 	case pb_common.MessageChannels_MIXING_STATS:
-		msg := pb_pump.MixingTankStats{}
+		msg := pb_column.MixingTankStats{}
 		err = proto.Unmarshal(buf[0:msgSize], &msg)
 		if err != nil {
 			log.Error("error in unmarshalling message", "err",err)
