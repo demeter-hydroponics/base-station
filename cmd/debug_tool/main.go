@@ -1,17 +1,22 @@
 package main
 
 import (
+	"encoding/json"
+
 	"github.com/charmbracelet/log"
 
 	"errors"
+
 	"github.com/gorilla/websocket"
 
 	pb_common "base-station/protobuf/generated/go/common"
-	pb_pump "base-station/protobuf/generated/go/pump"
 	pb_node "base-station/protobuf/generated/go/metrics"
-	"github.com/golang/protobuf/proto"
+	pb_pump "base-station/protobuf/generated/go/pump"
 	"io"
+
 	"net/http"
+
+	"github.com/golang/protobuf/proto"
 )
 
 func check_origin(r *http.Request) bool {
@@ -65,6 +70,12 @@ func ProcessMessage(reader io.Reader, buf [1024]byte) error {
 			return err
 		}
 		log.Info("msg recieved!", "msg", msg.String())
+		marshalled, err := json.MarshalIndent(msg, "", "  ")
+		if err != nil {
+			log.Error("could not pretty print")
+			return nil
+		}
+		log.Info("pretty print", "msg", string(marshalled))
 	case pb_common.MessageChannels_NODE_STATS:
 		msg := pb_node.NodeStats{}
 		err = proto.Unmarshal(buf[0:msgSize], &msg)
@@ -73,6 +84,12 @@ func ProcessMessage(reader io.Reader, buf [1024]byte) error {
 			return err
 		}
 		log.Info("msg recieved!", "msg", msg.String())
+		marshalled, err := json.MarshalIndent(msg, "", "  ")
+		if err != nil {
+			log.Error("could not pretty print")
+			return nil
+		}
+		log.Info("pretty print", "msg", string(marshalled))
 
 	}
 
