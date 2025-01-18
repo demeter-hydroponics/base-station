@@ -56,6 +56,7 @@ func main() {
 		}
 		log.Info("length of a header packet: ", "length", len(headerBytes))
 
+		// TODO make this use gorrilla and send as a binary message
 		if _, err := ws.Write(append(headerBytes, statBytes...)); err != nil {
 			log.Fatal(err)
 		}
