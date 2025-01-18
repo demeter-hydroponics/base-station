@@ -2,16 +2,19 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"time"
 
 	"github.com/charmbracelet/log"
 
 	"errors"
+	"strings"
 
 	"github.com/gorilla/websocket"
 
 	pb_common "base-station/protobuf/generated/go"
-	pb_node "base-station/protobuf/generated/go/node"
 	pb_column "base-station/protobuf/generated/go/column"
+	pb_node "base-station/protobuf/generated/go/node"
 	"io"
 
 	"net/http"
@@ -22,7 +25,8 @@ import (
 func check_origin(r *http.Request) bool {
 	return true
 }
-var upgrader = websocket.Upgrader{CheckOrigin:  check_origin} // use default options
+
+var upgrader = websocket.Upgrader{CheckOrigin: check_origin} // use default options
 
 func ProcessMessage(reader io.Reader, buf [1024]byte) error {
 	n, err := io.ReadFull(reader, buf[0:16])
@@ -30,7 +34,7 @@ func ProcessMessage(reader io.Reader, buf [1024]byte) error {
 		return err
 	}
 	if err != nil {
-		log.Error("there was an error reading a header in","err", err)
+		log.Error("there was an error reading a header in", "err", err)
 		return err
 	}
 	if n != 16 {
@@ -42,17 +46,17 @@ func ProcessMessage(reader io.Reader, buf [1024]byte) error {
 	header := pb_common.MessageHeader{}
 	err = proto.Unmarshal(buf[0:16], &header)
 	if err != nil {
-		log.Error("error in unmarshalling header","err", err)
+		log.Error("error in unmarshalling header", "err", err)
 		return err
 	}
 	// determine the size of the message and read in the message
 	msgSize := *header.Length
-	log.Info("header recieved!", "header", header.String())
+	//log.Info("header recieved!", "header", header.String())
 
 	// read in the message
 	n, err = io.ReadFull(reader, buf[0:msgSize])
 	if err != nil {
-		log.Error("there was an error reading a header in","err", err)
+		log.Error("there was an error reading a header in", "err", err)
 		return err
 	}
 	if uint32(n) != msgSize {
@@ -60,49 +64,60 @@ func ProcessMessage(reader io.Reader, buf [1024]byte) error {
 		return errors.New("incorrect number of bytes were read in for message")
 	}
 
-	// TODO but in a switch statement on msg type
+	// proto unmarshal into a struct
+	// json marshal the struct to json
+	// convert the json to a dict
+	// build a message string for display
+	// send to tea program
+	var msg proto.Message
+	var msgType string
+
 	switch *header.Channel {
 	case pb_common.MessageChannels_MIXING_STATS:
-		msg := pb_column.MixingTankStats{}
-		err = proto.Unmarshal(buf[0:msgSize], &msg)
-		if err != nil {
-			log.Error("error in unmarshalling message", "err",err)
-			return err
-		}
-		log.Info("msg recieved!", "msg", msg.String())
-		marshalled, err := json.MarshalIndent(msg, "", "  ")
-		if err != nil {
-			log.Error("could not pretty print")
-			return nil
-		}
-		log.Info("pretty print", "msg", string(marshalled))
+		msgType = "Mixing Stats"
+		msg = &pb_column.MixingTankStats{}
 	case pb_common.MessageChannels_NODE_STATS:
-		msg := pb_node.NodeStats{}
-		err = proto.Unmarshal(buf[0:msgSize], &msg)
-		if err != nil {
-			log.Error("error in unmarshalling message","err", err)
-			return err
-		}
-		log.Info("msg recieved!", "msg", msg.String())
-		marshalled, err := json.MarshalIndent(msg, "", "  ")
-		if err != nil {
-			log.Error("could not pretty print")
-			return nil
-		}
-		log.Info("pretty print", "msg", string(marshalled))
-
+		msgType = "Node Stats"
+		msg = &pb_node.NodeStats{}
 	}
 
-	return nil
+	err = proto.Unmarshal(buf[0:msgSize], msg)
+	if err != nil {
+		log.Error("error in unmarshalling message", "err", err)
+		return err
+	}
+	log.Info("msg recieved!", "msg", msg.String())
 
+	marshalled, err := json.MarshalIndent(msg, "", "  ")
+	if err != nil {
+		log.Error("could not pretty print")
+		return nil
+	}
+
+	msg_time := time.Unix(int64(header.GetTimestamp()), 0)
+	string_msg := strings.Replace(string(marshalled), "\"", "", -1)
+	string_msg = fmt.Sprintf("%d:%d:%d - ", msg_time.Hour(), msg_time.Minute(), msg_time.Second()) +
+		"IN >>>>>>>>>>>>\n" +
+		msgType + ": " +
+		string_msg
+	log.Info(string_msg)
+	prog.Send(MessageCmd(string_msg))
+
+	return nil
 }
+
+//func SenderRoutine(c *websocket.Conn) {
+//	for msg := TxMessages {
+//
+//	}
+//}
 
 // TODO gorilla websocket supports 1 reader and 1 writer concurrently so implement this as a goroutine and make another one for sending messages
 // Echo the data received on the WebSocket.
-func EchoServer(w http.ResponseWriter, r *http.Request) {
+func MockServer(w http.ResponseWriter, r *http.Request) {
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Error("upgrade :","err", err)
+		log.Error("upgrade :", "err", err)
 		return
 	}
 	defer c.Close()
@@ -128,7 +143,7 @@ func EchoServer(w http.ResponseWriter, r *http.Request) {
 			// this could be a ping/pong, a close or a text message. ignore all for now
 			_, err := io.ReadAll(reader)
 			if err != nil {
-				log.Error("there was an error clearing the reader","err", err)
+				log.Error("there was an error clearing the reader", "err", err)
 			}
 			log.Info("Got a non binary message", "msg type", messageType)
 			continue
@@ -143,7 +158,7 @@ func EchoServer(w http.ResponseWriter, r *http.Request) {
 					log.Info("EOF found, Message over")
 					break
 				}
-				log.Error( "encountered an error in reading message", "err",err)
+				log.Error("encountered an error in reading message", "err", err)
 
 			}
 		}

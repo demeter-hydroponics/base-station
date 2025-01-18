@@ -2,7 +2,7 @@ package main
 
 import (
 	"os"
-	"time"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textarea"
@@ -30,17 +30,14 @@ func (o Option) Title() string       { return o.title }
 func (o Option) Description() string { return o.description }
 func (o Option) FilterValue() string { return o.title }
 
-type Message struct {
-	content   string
-	timestamp time.Time
-}
+type MessageCmd string
 
 type Model struct {
 	msgView    viewport.Model
 	optionList list.Model
 	jsonEditor textarea.Model
 
-	messages        []Message
+	messages        []string
 	jsonTemplates   map[string]string
 	activeComponent ActiveComponent
 
@@ -66,7 +63,7 @@ func NewModel() Model {
 		jsonEditor:      jsonEditor,
 		optionList:      optionList,
 		activeComponent: ComponentList,
-		messages:        make([]Message, 0),
+		messages:        make([]string, 0),
 	}
 }
 
@@ -100,6 +97,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.jsonEditor.SetWidth(m.width/2 - 2)
 		m.jsonEditor.SetHeight(m.height/2 - 2)
+		return m, nil
+	case MessageCmd:
+		m.messages = append(m.messages, string(msg))
+		var sb strings.Builder
+		for _, message := range m.messages {
+			sb.WriteString(message)
+			sb.WriteString("\n")
+		}
+
+		// Update the viewport content
+		m.msgView.SetContent(sb.String())
+		m.msgView.GotoBottom()
 		return m, nil
 
 	case tea.KeyMsg:

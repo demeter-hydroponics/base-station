@@ -1,8 +1,8 @@
 package main
 
 import (
-	pb_common "base-station/protobuf/generated/go/common"
-	pb_pump "base-station/protobuf/generated/go/pump"
+	pb_common "base-station/protobuf/generated/go"
+	pb_column "base-station/protobuf/generated/go/column"
 	"github.com/charmbracelet/log"
 	"github.com/golang/protobuf/proto"
 	"golang.org/x/net/websocket"
@@ -34,9 +34,9 @@ func main() {
 
 		sv := pb_common.SensorValidity_VALID
 
-		stats := pb_pump.MixingTankStats{
-			TDSSense: &pb_pump.TDSSensor{TDSSensePPM: &tds_ppm, AnalogVoltage: &tds_v, Validity: &sv},
-			PHSense:  &pb_pump.PHSensor{PhSenseMolPerL: &ph_mol, AnalogVoltage: &ph_v, Validity: &sv},
+		stats := pb_column.MixingTankStats{
+			TDSSense: &pb_column.TDSSensor{TDSSensePPM: &tds_ppm, AnalogVoltage: &tds_v, Validity: &sv},
+			PHSense:  &pb_column.PHSensor{PhSenseMolPerL: &ph_mol, AnalogVoltage: &ph_v, Validity: &sv},
 		}
 		if statBytes, err = proto.Marshal(&stats); err != nil {
 			log.Fatal("failure in marshalling mixing stats message", "err", err)
