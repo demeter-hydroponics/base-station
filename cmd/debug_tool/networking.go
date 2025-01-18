@@ -109,11 +109,74 @@ func ProcessMessage(reader io.Reader, buf [1024]byte) error {
 func SenderRoutine(c *websocket.Conn) {
 	for msg := range TxMessages {
 		// convert json to protobuf
+		var pb proto.Message
+		var channel pb_common.MessageChannels
+		switch msg.proto_type {
+		case "SetPumpStateCommand":
+			pb = &pb_column.SetPumpStateCommand{}
+			channel = pb_common.MessageChannels_PUMP_STATS
+		case "PumpUpdateScheduleCommand":
+			pb = &pb_column.PumpUpdateScheduleCommand{}
+			channel = pb_common.MessageChannels_PUMP_STATS
+		}
+		err := JSONToProto([]byte(msg.json_content), pb)
+		if err != nil {
+			string_msg := "ERR =======================\n" +
+				"COULD NOT MARSHAL TO PROTO" +
+				err.Error()
+			prog.Send(MessageCmd(string_msg))
+			continue
+		}
 		// convert protobuf to bytes
-		// find length of bytes
-		// set channel value
-		//
-		_ = msg
+		var pb_bytes []byte
+		if pb_bytes, err = proto.Marshal(pb); err != nil {
+			string_msg := "ERR =======================\n" +
+				"COULD NOT MARSHAL TO BYTES" +
+				err.Error()
+			prog.Send(MessageCmd(string_msg))
+			continue
+		}
+		// make the header
+		stamp := uint64(time.Now().Unix())
+		size := uint32(len(pb_bytes))
+		header := pb_common.MessageHeader{
+			Channel:   &channel,
+			Timestamp: &stamp,
+			Length:    &size,
+		}
+
+		var header_bytes []byte
+		if header_bytes, err = proto.Marshal(&header); err != nil {
+			string_msg := "ERR =======================\n" +
+				"COULD NOT MARSHAL HEADER TO BYTES" +
+				err.Error()
+			prog.Send(MessageCmd(string_msg))
+			continue
+		}
+		if err := c.WriteMessage(websocket.BinaryMessage, append(header_bytes, pb_bytes...)); err != nil {
+			var string_msg string
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure) {
+				string_msg = "=======================\n" +
+					"WEBSOCKET CLOSED BY CLIENT" +
+					err.Error()
+
+			} else {
+				string_msg = "ERR =======================\n" +
+					"COULD NOT WRITE OUTGOING MESSAGE" +
+					err.Error()
+			}
+			prog.Send(MessageCmd(string_msg))
+			continue
+		}
+
+		msg_time := time.Unix(int64(header.GetTimestamp()), 0)
+		string_msg := strings.Replace(msg.json_content, "\"", "", -1)
+		string_msg = fmt.Sprintf("%d:%d:%d - ", msg_time.Hour(), msg_time.Minute(), msg_time.Second()) +
+			"OUT <<<<<<<<<<<<<<\n" +
+			msg.proto_type + ": " +
+			string_msg
+		log.Info(string_msg)
+		prog.Send(MessageCmd(string_msg))
 
 	}
 }
@@ -129,6 +192,7 @@ func MockServer(w http.ResponseWriter, r *http.Request) {
 	defer c.Close()
 
 	log.Info("recieved websocket connection")
+	go SenderRoutine(c)
 	// create a buffer for the header message
 	var buf [1024]byte
 	for {
