@@ -4,11 +4,16 @@ import (
 	"os"
 	"strings"
 
+	//	pb_common "base-station/protobuf/generated/go"
+	//	pb_column "base-station/protobuf/generated/go/column"
+	//	pb_node "base-station/protobuf/generated/go/node"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	//"github.com/golang/protobuf/proto"
 	"golang.org/x/term"
 )
 
@@ -40,6 +45,7 @@ type Model struct {
 	messages        []string
 	jsonTemplates   map[string]string
 	activeComponent ActiveComponent
+	chosen_command  string
 
 	width  int
 	height int
@@ -47,11 +53,13 @@ type Model struct {
 
 func NewModel() Model {
 	msgView := viewport.New(0, 0)
+	//msgView.MouseWheelEnabled = true
+	//msgView.YOffset = 15
 	msgView.SetContent("This is where messages will come from")
 
 	optItems := []list.Item{
-		Option{title: "item 1", description: "desc"},
-		Option{title: "item 2", description: "desc"},
+		Option{title: "SetPumpStateCommand", description: "sets the pump state"},
+		Option{title: "PumpUpdateScheduleCommand", description: "sets the pump schedule"},
 	}
 	optionList := list.New(optItems, list.NewDefaultDelegate(), 0, 0)
 
@@ -64,6 +72,7 @@ func NewModel() Model {
 		optionList:      optionList,
 		activeComponent: ComponentList,
 		messages:        make([]string, 0),
+		chosen_command:  "",
 	}
 }
 
@@ -127,11 +136,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.optionList = newListModel
 			cmds = append(cmds, cmd)
 			// If an item was selected (usually enter key)
-			if selected, ok := m.optionList.SelectedItem().(Option); ok {
-				// do something here on selection of item
-				_ = selected
-				//m.activeComponent = ComponentEditor
-				//m.jsonEditor.Focus()
+			if msg.String() == "enter" {
+				if selected, ok := m.optionList.SelectedItem().(Option); ok {
+					// do something here on selection of item
+					m.chosen_command = selected.Title()
+					marshalled, err := ProtoToJSON(Commands[m.chosen_command])
+					if err != nil {
+						m.jsonEditor.SetValue(err.Error())
+						// probably send an error to the msg view
+						return m, nil
+					}
+
+					m.jsonEditor.SetValue(string(marshalled))
+					m.activeComponent = ComponentEditor
+					m.jsonEditor.Focus()
+				}
 			}
 		case ComponentEditor:
 			newEditor, cmd := m.jsonEditor.Update(msg)
@@ -139,6 +158,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 			if msg.String() == "ctrl+s" {
 				// do something on submit
+				json_string := m.jsonEditor.Value()
+				tx := &TXMessage{
+					proto_type:   m.chosen_command,
+					json_content: json_string,
+				}
+
+				TxMessages <- tx
+
+				m.activeComponent = ComponentMessages
+				m.jsonEditor.Blur()
 			}
 		case ComponentMessages:
 			newView, cmd := m.msgView.Update(msg)

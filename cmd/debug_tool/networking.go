@@ -106,11 +106,17 @@ func ProcessMessage(reader io.Reader, buf [1024]byte) error {
 	return nil
 }
 
-//func SenderRoutine(c *websocket.Conn) {
-//	for msg := TxMessages {
-//
-//	}
-//}
+func SenderRoutine(c *websocket.Conn) {
+	for msg := range TxMessages {
+		// convert json to protobuf
+		// convert protobuf to bytes
+		// find length of bytes
+		// set channel value
+		//
+		_ = msg
+
+	}
+}
 
 // TODO gorilla websocket supports 1 reader and 1 writer concurrently so implement this as a goroutine and make another one for sending messages
 // Echo the data received on the WebSocket.
