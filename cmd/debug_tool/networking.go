@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -95,8 +94,9 @@ func ProcessMessage(reader io.Reader, buf [1024]byte) error {
 		return nil
 	}
 
+	msg_time := time.UnixMicro(int64(header.GetTimestamp()))
 	string_msg := strings.Replace(string(marshalled), "\"", "", -1)
-	string_msg = fmt.Sprintf("%d - ", header.GetTimestamp()) +
+	string_msg = msg_time.Format(time.RFC3339Nano) + " - " +
 		"IN >>>>>>>>>>>>\n" +
 		msgType + ": " +
 		string_msg
@@ -169,8 +169,9 @@ func SenderRoutine(c *websocket.Conn) {
 			continue
 		}
 
+		msg_time := time.UnixMicro(int64(stamp))
 		string_msg := strings.Replace(msg.json_content, "\"", "", -1)
-		string_msg = fmt.Sprintf("%d - ", stamp) +
+		string_msg = msg_time.Format(time.RFC3339Nano) + " - " +
 			"OUT <<<<<<<<<<<<<<\n" +
 			msg.proto_type + ": " +
 			string_msg
