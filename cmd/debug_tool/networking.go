@@ -64,11 +64,6 @@ func ProcessMessage(reader io.Reader, buf [1024]byte) error {
 		return errors.New("incorrect number of bytes were read in for message")
 	}
 
-	// proto unmarshal into a struct
-	// json marshal the struct to json
-	// convert the json to a dict
-	// build a message string for display
-	// send to tea program
 	var msg proto.Message
 	var msgType string
 
@@ -79,6 +74,12 @@ func ProcessMessage(reader io.Reader, buf [1024]byte) error {
 	case pb_common.MessageChannels_NODE_STATS:
 		msgType = "Node Stats"
 		msg = &pb_node.NodeStats{}
+	case pb_common.MessageChannels_PUMP_MANAGER_INFO:
+		msgType = "Pump Manager Info"
+		msg = &pb_column.PumpManagerInfo{}
+	case pb_common.MessageChannels_PUMP_STATS:
+		msgType = "Pump Tank Stats"
+		msg = &pb_column.PumpTankStats{}
 	}
 
 	err = proto.Unmarshal(buf[0:msgSize], msg)
@@ -94,9 +95,8 @@ func ProcessMessage(reader io.Reader, buf [1024]byte) error {
 		return nil
 	}
 
-	msg_time := time.Unix(int64(header.GetTimestamp()), 0)
 	string_msg := strings.Replace(string(marshalled), "\"", "", -1)
-	string_msg = fmt.Sprintf("%d:%d:%d - ", msg_time.Hour(), msg_time.Minute(), msg_time.Second()) +
+	string_msg = fmt.Sprintf("%d - ", header.GetTimestamp()) +
 		"IN >>>>>>>>>>>>\n" +
 		msgType + ": " +
 		string_msg
@@ -114,10 +114,10 @@ func SenderRoutine(c *websocket.Conn) {
 		switch msg.proto_type {
 		case "SetPumpStateCommand":
 			pb = &pb_column.SetPumpStateCommand{}
-			channel = pb_common.MessageChannels_PUMP_STATS
+			channel = pb_common.MessageChannels_SET_PUMP_STATE_COMMAND
 		case "PumpUpdateScheduleCommand":
 			pb = &pb_column.PumpUpdateScheduleCommand{}
-			channel = pb_common.MessageChannels_PUMP_STATS
+			channel = pb_common.MessageChannels_PUMP_UPDATE_SCHEDULE_COMMAND
 		}
 		err := JSONToProto([]byte(msg.json_content), pb)
 		if err != nil {
@@ -137,7 +137,7 @@ func SenderRoutine(c *websocket.Conn) {
 			continue
 		}
 		// make the header
-		stamp := uint64(time.Now().Unix())
+		stamp := uint64(time.Now().UnixMicro())
 		size := uint32(len(pb_bytes))
 		header := pb_common.MessageHeader{
 			Channel:   &channel,
@@ -169,9 +169,8 @@ func SenderRoutine(c *websocket.Conn) {
 			continue
 		}
 
-		msg_time := time.Unix(int64(header.GetTimestamp()), 0)
 		string_msg := strings.Replace(msg.json_content, "\"", "", -1)
-		string_msg = fmt.Sprintf("%d:%d:%d - ", msg_time.Hour(), msg_time.Minute(), msg_time.Second()) +
+		string_msg = fmt.Sprintf("%d - ", stamp) +
 			"OUT <<<<<<<<<<<<<<\n" +
 			msg.proto_type + ": " +
 			string_msg

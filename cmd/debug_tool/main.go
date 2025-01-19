@@ -42,8 +42,6 @@ func main() {
 	log.SetOutput(io.Discard)
 	// start up the server
 	go func() {
-		//log.Info("starting server on :12345")
-		//log.Info("Connect on ws://<ip>:12345/ws")
 		http.HandleFunc("/ws", MockServer)
 		log.Error("Error in server:", "err", http.ListenAndServe(":12345", nil))
 	}()

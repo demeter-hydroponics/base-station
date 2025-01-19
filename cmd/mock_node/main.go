@@ -42,7 +42,7 @@ func main() {
 			log.Fatal("failure in marshalling mixing stats message", "err", err)
 		}
 
-		stamp := uint64(time.Now().Unix())
+		stamp := uint64(time.Now().UnixMicro())
 		size := uint32(len(statBytes))
 		channel := pb_common.MessageChannels_MIXING_STATS
 		header := pb_common.MessageHeader{

@@ -55,7 +55,7 @@ func NewModel() Model {
 	msgView := viewport.New(0, 0)
 	//msgView.MouseWheelEnabled = true
 	//msgView.YOffset = 15
-	msgView.SetContent("This is where messages will come from")
+	msgView.SetContent("Connect on ws://<ip>:12345/ws")
 
 	optItems := []list.Item{
 		Option{title: "SetPumpStateCommand", description: "sets the pump state"},
@@ -217,7 +217,7 @@ func (m Model) View() string {
 		editorBox = editorBox.BorderForeground(lipgloss.Color("238"))
 	}
 
-	return lipgloss.JoinHorizontal(lipgloss.Top,
+	return lipgloss.JoinHorizontal(lipgloss.Center,
 		msgBox.Render(m.msgView.View()),
 		lipgloss.JoinVertical(lipgloss.Left,
 			listBox.Render(m.optionList.View()),
