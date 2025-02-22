@@ -2,19 +2,15 @@ package handlers
 
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/charmbracelet/log"
 
 	"errors"
-	"strings"
 
 	"github.com/gorilla/websocket"
 
 	pb_common "base-station/protobuf/generated/go"
-	pb_column "base-station/protobuf/generated/go/column"
-	pb_node "base-station/protobuf/generated/go/node"
 	"io"
 
 	"net/http"
@@ -22,7 +18,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-func ProcessMessage(reader io.Reader, buf [1024]byte) error {
+func ReadMessage(reader io.Reader, buf [1024]byte) error {
 	n, err := io.ReadFull(reader, buf[0:16])
 	if err == io.EOF {
 		return err
@@ -45,7 +41,6 @@ func ProcessMessage(reader io.Reader, buf [1024]byte) error {
 	}
 	// determine the size of the message and read in the message
 	msgSize := *header.Length
-	//log.Info("header recieved!", "header", header.String())
 
 	// read in the message
 	n, err = io.ReadFull(reader, buf[0:msgSize])
@@ -58,24 +53,21 @@ func ProcessMessage(reader io.Reader, buf [1024]byte) error {
 		return errors.New("incorrect number of bytes were read in for message")
 	}
 
-	var msg proto.Message
-	var msgType string
+	var msg proto.Message = channelToPb(*header.Channel)
+    if msg == nil {
+        return errors.New("header is invalid, or unsupported")
+    }
 
-    // ADD NEW TYPES HERE
-	switch *header.Channel {
-	case pb_common.MessageChannels_MIXING_STATS:
-		msgType = "Mixing Stats"
-		msg = &pb_column.MixingTankStats{}
-	case pb_common.MessageChannels_NODE_STATS:
-		msgType = "Node Stats"
-		msg = &pb_node.NodeStats{}
-	case pb_common.MessageChannels_PUMP_MANAGER_INFO:
-		msgType = "Pump Manager Info"
-		msg = &pb_column.PumpManagerInfo{}
-	case pb_common.MessageChannels_PUMP_STATS:
-		msgType = "Pump Tank Stats"
-		msg = &pb_column.PumpTankStats{}
-	}
+//    // ADD NEW TYPES HERE
+//	switch *header.Channel {
+//	case pb_common.MessageChannels_MIXING_STATS:
+//		msg = &pb_column.MixingTankStats{}
+//	case pb_common.MessageChannels_NODE_STATS:
+//		msg = &pb_node.NodeStats{}
+//	case pb_common.MessageChannels_PUMP_MANAGER_INFO:
+//		msg = &pb_column.PumpManagerInfo{}
+//	case pb_common.MessageChannels_PUMP_STATS:
+//		msg = &pb_column.PumpTankStats{}
 
 	err = proto.Unmarshal(buf[0:msgSize], msg)
 	if err != nil {
@@ -83,26 +75,50 @@ func ProcessMessage(reader io.Reader, buf [1024]byte) error {
 		return err
 	}
 	log.Info("msg recieved!", "msg", msg.String())
-
-	marshalled, err := json.MarshalIndent(msg, "", "  ")
-	if err != nil {
-		log.Error("could not pretty print")
-		return nil
-	}
-
-	msg_time := time.UnixMicro(int64(header.GetTimestamp()))
-	string_msg := strings.Replace(string(marshalled), "\"", "", -1)
-	string_msg = msg_time.Format(time.RFC3339Nano) + " - " +
-		"IN >>>>>>>>>>>>\n" +
-		msgType + ": " +
-		string_msg
-	log.Info(string_msg)
+    // TODO send this struct through to some goroutine for processing stats if its a stat
 
 	return nil
-    // do something with the message
 }
 
-func Node_Handler(w http.ResponseWriter, r *http.Request) {
+func SenderRoutine(c *websocket.Conn, toSend <-chan proto.Message, quit <-chan bool) {
+	for msg := range toSend {
+		var pb proto.Message
+		var channel = pbToChannel(msg)
+        var err error
+
+		// convert protobuf to bytes
+		var pb_bytes []byte
+		if pb_bytes, err = proto.Marshal(pb); err != nil {
+			log.Error("There was an error marshalling the protobuf","err", err.Error())
+			continue
+		}
+		// make the header
+		stamp := uint64(time.Now().UnixMicro())
+		size := uint32(len(pb_bytes))
+		header := pb_common.MessageHeader{
+			Channel:   &channel,
+			Timestamp: &stamp,
+			Length:    &size,
+		}
+
+		var header_bytes []byte
+		if header_bytes, err = proto.Marshal(&header); err != nil {
+			log.Error("There was an error marshalling the header","err", err.Error())
+			continue
+		}
+		if err := c.WriteMessage(websocket.BinaryMessage, append(header_bytes, pb_bytes...)); err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure) {
+                log.Error("ERR: connection closed by client", "err", err.Error())
+			} else {
+                log.Error("ERR: could not write outgoing msg", "err", err.Error())
+			}
+			continue
+		}
+	}
+}
+
+// this will get called on a request from a controller
+func Controller_Handler(w http.ResponseWriter, r *http.Request) {
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Error("upgrade :", "err", err)
@@ -115,7 +131,6 @@ func Node_Handler(w http.ResponseWriter, r *http.Request) {
 	var buf [1024]byte
 	for {
 		messageType, reader, err := c.NextReader()
-		// TODO do a check on message type, this should be a binary or skip it
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure) {
 				log.Info("socket has been closed by client")
@@ -126,6 +141,7 @@ func Node_Handler(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Info("Got a new frame")
 
+		// NOTE do a check on message type, this should be a Text or skip it
 		if messageType != websocket.TextMessage {
 			// this could be a ping/pong, a close or a text message. ignore all for now
 			_, err := io.ReadAll(reader)
@@ -136,16 +152,17 @@ func Node_Handler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+        // TODO check for connection closed somewhere so you can trigger the send routine to die
+
 		for {
 			log.Info("Processing a Message")
-			err = ProcessMessage(reader, buf)
+			err = ReadMessage(reader, buf)
 			if err != nil {
 				if err == io.EOF {
 					log.Info("EOF found, Message over")
 					break
 				}
 				log.Error("encountered an error in reading message", "err", err)
-
 			}
 		}
 

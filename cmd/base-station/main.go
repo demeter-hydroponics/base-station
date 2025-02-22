@@ -1,9 +1,11 @@
 package main
 
 import (
-    "fmt"
+    "base-station/internal/handlers"
+	"github.com/charmbracelet/log"
 )
 
 func main() {
-	fmt.Println("Hello world")
+	log.Info("Starting up Base Station")
+    handlers.Run()
 }
