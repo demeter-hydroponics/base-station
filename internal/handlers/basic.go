@@ -2,6 +2,7 @@ package handlers
 
 import (
     "net/http"
+    "sync"
 	"github.com/gorilla/websocket"
 	"github.com/charmbracelet/log"
 	pb_common "base-station/protobuf/generated/go"
@@ -16,6 +17,12 @@ func check_origin(r *http.Request) bool {
 
 var upgrader = websocket.Upgrader{CheckOrigin: check_origin} // use default options
 
+var metrics_pb chan proto.Message
+/*
+This Might be temporary, might be a bad idea. 
+I want a single function/handler to be able to update the config at once, others will be rejected temporarily until the current one is processed.
+*/
+var farm_config_mutex sync.Mutex
 
 func Run () {
     log.Info("running server")
