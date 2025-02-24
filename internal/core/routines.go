@@ -1,4 +1,4 @@
-package handlers
+package core
 
 import (
 	"github.com/golang/protobuf/proto"
@@ -8,28 +8,40 @@ import (
     "base-station/internal/database/farm-config"
 )
 
-
-func ProcessMetrics(metrics_pb <- chan proto.Message) {
+// TODO metrics collection function 
+func ProcessMetrics(metrics_pb <- chan PbMetric) {
     log.Info("Starting Metrics Processing Goroutine")
     for msg := range metrics_pb {
         // TODO do a type check here and handle it
-        _ = msg
+        pb := msg.Pb
+        _ = pb
     }
 }
 
-func UpdateConfig(new_config farm_config.FarmConfig) error {
+
+// NOTE not sure if this is needed
+func ValidateConfig() error {
     // TODO validate the configuration makes sense
-    if farm_config_mutex.TryLock() {
+    return nil
+}
+
+func UpdateConfig(new_config farm_config.FarmConfig) error {
+    if farm_config.ConfigMutex.TryLock() {
         return errors.New("mutex is locked")
     }
-    defer farm_config_mutex.Unlock()
-    // TODO apply the changes in the config
+    defer farm_config.ConfigMutex.Unlock() 
 
+    // TODO apply the changes in the config
     for _, column := range new_config.Columns {
         _ = column
-        // apply the pump configs
-        // apply the mixing configs
+        id := column.CtrlCfg.Id.String()
 
+        // apply the pump configs
+        UpdatePumpState(id, column.PrimaryPumpState, column.SecondaryPumpState)
+        // apply the mixing configs
+        UpdateMixingState(id, column.MixingState)
+
+        // TODO implement node configs
         for _, node := range column.Nodes {
             _ = node
             // TODO i think for now we arent actually configuring nodes 
