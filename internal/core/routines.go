@@ -27,7 +27,7 @@ func ValidateConfig() error {
 }
 
 func UpdateConfig(new_config *pb_panel.FarmConfig) error {
-    if farm_config.ConfigMutex.TryLock() {
+    if !farm_config.ConfigMutex.TryLock() {
         return errors.New("cannot process config, another config is being processed right now")
     }
     defer farm_config.ConfigMutex.Unlock() 

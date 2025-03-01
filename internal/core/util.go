@@ -6,7 +6,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-var SenderChannels map[string]chan proto.Message
+var SenderChannels = map[string]chan proto.Message {}
 
 // NOTE no need for rw mutex as its multiple writers, 1 reader
 var SenderChannelsMutex sync.Mutex

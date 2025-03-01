@@ -5,12 +5,14 @@ import (
 	//"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/charmbracelet/log"
-	farm_config "base-station/internal/database/farm-config"
+//	farm_config "base-station/internal/database/farm-config"
 	pb_common "base-station/protobuf/generated/go"
 	pb_column "base-station/protobuf/generated/go/column"
 	pb_node "base-station/protobuf/generated/go/node"
     "encoding/json"
 	"github.com/golang/protobuf/proto"
+	"bytes"
+	"github.com/golang/protobuf/jsonpb"
     "base-station/internal/core"
 )
 
@@ -28,6 +30,8 @@ func Run () {
 	http.HandleFunc("/ws", controllerHandler)
 	http.HandleFunc("/config", configHandler)
 	http.HandleFunc("/connected", testGetConnectedHandler)
+    log.Info("Running server on <ip>:12345")
+    log.Info("available endpoints: /ws, /config (post), /connected")
 	log.Error("Error in server:", "err", http.ListenAndServe(":12345", nil))
 }
 
@@ -58,6 +62,27 @@ func channelToPb(channel pb_common.MessageChannels) proto.Message {
 	}
     return nil
 }
+
+
+// ProtoToJSON converts a proto2 message to JSON bytes
+func ProtoToJSON(pb proto.Message) ([]byte, error) {
+	marshaler := &jsonpb.Marshaler{
+		EmitDefaults: true, // Include fields even if they're at default values
+		OrigName:     true, // Use camelCase naming in JSON
+		Indent:       "  ",
+	}
+	json, err := marshaler.MarshalToString(pb)
+	return []byte(json), err
+}
+
+// JSONToProto converts JSON bytes to a proto2 message
+func JSONToProto(data []byte, pb proto.Message) error {
+	unmarshaler := &jsonpb.Unmarshaler{
+		AllowUnknownFields: false, // More forgiving JSON parsing
+	}
+	return unmarshaler.Unmarshal(bytes.NewReader(data), pb)
+}
+
 
 
 func OnboardController(id, controllerType string) (string, bool, error) {

@@ -11,7 +11,6 @@ import (
 // NOTE These functions should construct a proto message and send it to the appropriate channel
 // NOTE farm config msg -> pb message
 func UpdatePumpState(id string, primary, secondary pb_column.PumpState) error {
-
     // convert the pumpstate to a pb command
     pumpType := pb_column.PumpType_PRIMARY
     if primary == secondary {

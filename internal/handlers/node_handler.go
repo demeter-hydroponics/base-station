@@ -74,13 +74,13 @@ func ReadMessage(reader io.Reader, buf [1024]byte, processingChannel chan <- cor
 
 func SenderRoutine(c *websocket.Conn, toSend <-chan proto.Message, quit <-chan bool) {
 	for msg := range toSend {
-		var pb proto.Message
 		var channel = pbToChannel(msg)
+        log.Info("recieved msg","channel", channel)
         var err error
 
 		// convert protobuf to bytes
 		var pb_bytes []byte
-		if pb_bytes, err = proto.Marshal(pb); err != nil {
+		if pb_bytes, err = proto.Marshal(msg); err != nil {
 			log.Error("There was an error marshalling the protobuf","err", err.Error())
 			continue
 		}
@@ -177,7 +177,7 @@ func controllerHandler(w http.ResponseWriter, r *http.Request) {
 
 		for {
 			log.Info("Processing a Message")
-			err = ReadMessage(reader, buf, core.MetricsChannel)
+			err = ReadMessage(reader, buf, core.MetricsChannel, id)
 			if err != nil {
 				if err == io.EOF {
 					log.Info("EOF found, Message over")

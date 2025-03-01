@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/charmbracelet/log"
-	"github.com/golang/protobuf/proto"
+	//"github.com/golang/protobuf/proto"
 )
 
 
@@ -32,8 +32,9 @@ func configPostHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    var farm_config pb_panel.FarmConfig
-    err = proto.Unmarshal(body, &farm_config)
+    var newFarmConfig pb_panel.FarmConfig
+//    err = proto.Unmarshal(body, &farm_config)
+    err = JSONToProto(body, &newFarmConfig)
     if err != nil {
         log.Error("There was an error unmarshalling the farm config", "err", err) 
         // send a response
@@ -41,7 +42,7 @@ func configPostHandler(w http.ResponseWriter, r *http.Request) {
         return 
     }
 
-    err = core.UpdateConfig(&farm_config)
+    err = core.UpdateConfig(&newFarmConfig)
     if err != nil {
         log.Error("There was an error setting the new config", "err", err) 
         // send a response
@@ -52,3 +53,5 @@ func configPostHandler(w http.ResponseWriter, r *http.Request) {
 
 func configGetHandler(w http.ResponseWriter, r *http.Request) {
 }
+
+
