@@ -1,20 +1,21 @@
 package core
 
 import (
-	"github.com/golang/protobuf/proto"
-	"github.com/charmbracelet/log"
-    "errors"
+	//	"github.com/golang/protobuf/proto"
+	"errors"
 
-    "base-station/internal/database/farm-config"
+	"github.com/charmbracelet/log"
+
+	"base-station/internal/database/farm-config"
+	pb_panel "base-station/protobuf/generated/go/panel"
 )
 
-// TODO metrics collection function 
+// TODO metrics collection function
 func ProcessMetrics(metrics_pb <- chan PbMetric) {
     log.Info("Starting Metrics Processing Goroutine")
     for msg := range metrics_pb {
         // TODO do a type check here and handle it
-        pb := msg.Pb
-        _ = pb
+        log.Info("Message recieved!", "time", msg.Timestamp.String())
     }
 }
 
@@ -25,21 +26,22 @@ func ValidateConfig() error {
     return nil
 }
 
-func UpdateConfig(new_config farm_config.FarmConfig) error {
+func UpdateConfig(new_config *pb_panel.FarmConfig) error {
     if farm_config.ConfigMutex.TryLock() {
-        return errors.New("mutex is locked")
+        return errors.New("cannot process config, another config is being processed right now")
     }
     defer farm_config.ConfigMutex.Unlock() 
 
     // TODO apply the changes in the config
     for _, column := range new_config.Columns {
         _ = column
-        id := column.CtrlCfg.Id.String()
+        id := *column.Id
+        log.Infof("setting controller %s", id) 
 
         // apply the pump configs
-        UpdatePumpState(id, column.PrimaryPumpState, column.SecondaryPumpState)
+        UpdatePumpState(id, *column.PrimaryPumpState, *column.SecondaryPumpState)
         // apply the mixing configs
-        UpdateMixingState(id, column.MixingState)
+        UpdateMixingState(id, *column.MixingState)
 
         // TODO implement node configs
         for _, node := range column.Nodes {
@@ -52,6 +54,5 @@ func UpdateConfig(new_config farm_config.FarmConfig) error {
         _ = node
         // TODO configure nodes
     }
-
     return nil
 }
