@@ -2,49 +2,28 @@ package main
 
 import (
 	pb_common "base-station/protobuf/generated/go"
-	pb_column "base-station/protobuf/generated/go/column"
+	pb_node "base-station/protobuf/generated/go/node"
 	"github.com/charmbracelet/log"
 	"github.com/golang/protobuf/proto"
-	"golang.org/x/net/websocket"
+	"github.com/gorilla/websocket"
+    "base-station/internal/handlers"
 	"time"
 )
 
-func main() {
-	// config the address and origin of the websocket server
-	origin := "http://localhost/"
-	url := "ws://localhost:12345/ws"
 
-	// connect to the server
-	ws, err := websocket.Dial(url, "", origin)
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	defer ws.Close()
-	for {
-
+func ConvertMessageToFrame(msg proto.Message) ([]byte, error) {
 		var headerBytes []byte
-		var statBytes []byte
-
-		tds_ppm := float32(0.24)
-		tds_v := float32(0.25)
-
-		ph_mol := float32(0.42)
-		ph_v := float32(0.52)
-
-		sv := pb_common.SensorValidity_VALID
-
-		stats := pb_column.MixingTankStats{
-			TDSSense: &pb_column.TDSSensor{TDSSensePPM: &tds_ppm, AnalogVoltage: &tds_v, Validity: &sv},
-			PHSense:  &pb_column.PHSensor{PhSenseMolPerL: &ph_mol, AnalogVoltage: &ph_v, Validity: &sv},
-		}
-		if statBytes, err = proto.Marshal(&stats); err != nil {
-			log.Fatal("failure in marshalling mixing stats message", "err", err)
+		var msgBytes []byte
+        var err error
+		if msgBytes, err = proto.Marshal(msg); err != nil {
+			log.Error("failure in marshalling message", "err", err)
+            return []byte{}, err
 		}
 
 		stamp := uint64(time.Now().UnixMicro())
-		size := uint32(len(statBytes))
-		channel := pb_common.MessageChannels_MIXING_STATS
+		size := uint32(len(msgBytes))
+		channel := handlers.PbToChannel(msg) 
 		header := pb_common.MessageHeader{
 			Channel:   &channel,
 			Timestamp: &stamp,
@@ -52,13 +31,78 @@ func main() {
 		}
 
 		if headerBytes, err = proto.Marshal(&header); err != nil {
-			log.Fatal("failure in marshalling header packet", "err", err)
+			log.Error("failure in marshalling header packet", "err", err)
+            return []byte{}, err
 		}
 		log.Info("length of a header packet: ", "length", len(headerBytes))
+        log.Info("sent data", "header", headerBytes, "msg", msgBytes)
+
+    return append(headerBytes, msgBytes...), nil
+
+}
+
+func main() {
+	// config the address and origin of the websocket server
+	url := "ws://localhost:12345/ws?id=0a7dbbd3-d42b-4593-9135-8509c2ed520e&type=0"
+
+	// connect to the server
+	ws,_, err := websocket.DefaultDialer.Dial(url, nil )
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer ws.Close()
+	for {
+
+
+		sv := pb_common.SensorValidity_VALID
+        index0 := uint32(0)
+        index1 := uint32(1)
+        ppfd := float32(1.0)
+        current := float32(0.5)
+        lightSense := pb_node.LightSensorStats{
+            SensedPPFD: &ppfd, 
+            Validity: &sv,
+        }
+        growLightMetrics := pb_node.GrowLightStats{
+            SetPPFD: &ppfd,
+            Current: &current,
+            CurrentValid: &sv,
+        }
+        stats := pb_node.GrowLightSectionStats{
+            GrowLightIndex: &index0,
+            LightSense: &lightSense,
+            GrowLightMetrics: &growLightMetrics,
+        }
+        stats2 := pb_node.GrowLightSectionStats{
+            GrowLightIndex: &index1,
+            LightSense: &lightSense,
+            GrowLightMetrics: &growLightMetrics,
+        }
+
+        statBytes, err := ConvertMessageToFrame(&stats)
+        if err != nil {
+            log.Error("there was an error with converting the message frame", "err", err)
+            return 
+        }
+
+        log.Info(statBytes)
 
 		// TODO make this use gorrilla and send as a binary message
-		if _, err := ws.Write(append(headerBytes, statBytes...)); err != nil {
+		if  err := ws.WriteMessage(websocket.BinaryMessage,statBytes); err != nil {
 			log.Fatal(err)
+            return
+		}
+        stat2Bytes, err := ConvertMessageToFrame(&stats2)
+        if err != nil {
+            log.Error("there was an error with converting the message frame", "err", err)
+            return 
+        }
+
+		// TODO make this use gorrilla and send as a binary message
+		if  err := ws.WriteMessage(websocket.BinaryMessage, stat2Bytes); err != nil {
+			log.Fatal(err)
+            return 
 		}
 		time.Sleep(time.Second)
 	}

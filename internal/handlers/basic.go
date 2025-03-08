@@ -1,19 +1,20 @@
 package handlers
 
 import (
-    "net/http"
+	"net/http"
 	//"github.com/google/uuid"
-	"github.com/gorilla/websocket"
 	"github.com/charmbracelet/log"
-//	farm_config "base-station/internal/database/farm-config"
+	"github.com/gorilla/websocket"
+
+	//	farm_config "base-station/internal/database/farm-config"
+	"base-station/internal/core"
+	farm_config "base-station/internal/database/farm-config"
 	pb_common "base-station/protobuf/generated/go"
 	pb_column "base-station/protobuf/generated/go/column"
 	pb_node "base-station/protobuf/generated/go/node"
-    "encoding/json"
+	"encoding/json"
+
 	"github.com/golang/protobuf/proto"
-	"bytes"
-	"github.com/golang/protobuf/jsonpb"
-    "base-station/internal/core"
 )
 
 func check_origin(r *http.Request) bool {
@@ -25,7 +26,12 @@ var upgrader = websocket.Upgrader{CheckOrigin: check_origin} // use default opti
 var metrics_pb chan proto.Message
 
 func Run () {
+
+    farm_config.InitFarmConfig()
+
+    core.MetricsChannel = make(chan core.PbMetric, 1000)
     go core.ProcessMetrics(core.MetricsChannel)
+
     log.Info("running server")
 	http.HandleFunc("/ws", controllerHandler)
 	http.HandleFunc("/config", configHandler)
@@ -35,7 +41,7 @@ func Run () {
 	log.Error("Error in server:", "err", http.ListenAndServe(":12345", nil))
 }
 
-func pbToChannel(msg proto.Message) pb_common.MessageChannels {
+func PbToChannel(msg proto.Message) pb_common.MessageChannels {
 		var channel pb_common.MessageChannels
         switch msg.(type) {
         case *pb_column.SetPumpStateCommand:
@@ -44,43 +50,29 @@ func pbToChannel(msg proto.Message) pb_common.MessageChannels {
 			channel = pb_common.MessageChannels_PUMP_UPDATE_SCHEDULE_COMMAND
         case *pb_column.SetMixingStateCommand:
             channel = pb_common.MessageChannels_SET_MIXING_STATE_COMMAND
+        case *pb_node.SetPPFDReferenceCommand:
+            channel = pb_common.MessageChannels_GROW_LIGHT_PPFD_REFERENCE_COMMAND
+        case *pb_node.GrowLightSectionStats:
+            channel = pb_common.MessageChannels_GROW_LIGHT_METRICS
 		}
     return channel
 }
 
 
-func channelToPb(channel pb_common.MessageChannels) proto.Message {
+func ChannelToPb(channel pb_common.MessageChannels) proto.Message {
 	switch channel {
 	case pb_common.MessageChannels_MIXING_STATS:
 		return &pb_column.MixingTankStats{}
 	case pb_common.MessageChannels_NODE_STATS:
 		return &pb_node.NodeStats{}
-	case pb_common.MessageChannels_PUMP_MANAGER_INFO:
-		return &pb_column.PumpManagerInfo{}
 	case pb_common.MessageChannels_PUMP_STATS:
 		return &pb_column.PumpTankStats{}
+	case pb_common.MessageChannels_PUMP_MANAGER_INFO:
+		return &pb_column.PumpManagerInfo{}
+    case pb_common.MessageChannels_GROW_LIGHT_METRICS:
+        return &pb_node.GrowLightSectionStats{}
 	}
     return nil
-}
-
-
-// ProtoToJSON converts a proto2 message to JSON bytes
-func ProtoToJSON(pb proto.Message) ([]byte, error) {
-	marshaler := &jsonpb.Marshaler{
-		EmitDefaults: true, // Include fields even if they're at default values
-		OrigName:     true, // Use camelCase naming in JSON
-		Indent:       "  ",
-	}
-	json, err := marshaler.MarshalToString(pb)
-	return []byte(json), err
-}
-
-// JSONToProto converts JSON bytes to a proto2 message
-func JSONToProto(data []byte, pb proto.Message) error {
-	unmarshaler := &jsonpb.Unmarshaler{
-		AllowUnknownFields: false, // More forgiving JSON parsing
-	}
-	return unmarshaler.Unmarshal(bytes.NewReader(data), pb)
 }
 
 

@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"base-station/internal/core"
+    "base-station/internal/database/farm-config"
+    "base-station/internal/utils"
 	pb_panel "base-station/protobuf/generated/go/panel"
 	"io"
 	"net/http"
@@ -34,7 +36,7 @@ func configPostHandler(w http.ResponseWriter, r *http.Request) {
 
     var newFarmConfig pb_panel.FarmConfig
 //    err = proto.Unmarshal(body, &farm_config)
-    err = JSONToProto(body, &newFarmConfig)
+    err = utils.JSONToProto(body, &newFarmConfig)
     if err != nil {
         log.Error("There was an error unmarshalling the farm config", "err", err) 
         // send a response
@@ -52,6 +54,18 @@ func configPostHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func configGetHandler(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    farm_config.ConfigMutex.Lock()
+    defer farm_config.ConfigMutex.Unlock()
+    
+    json_config, err := utils.ProtoToJSON(&farm_config.Config)
+    if err != nil {
+        log.Error("Error getting config", "err", err)
+        http.Error(w, "Error getting config", http.StatusInternalServerError)
+        return
+    }
+  	w.WriteHeader(http.StatusOK)
+    w.Write(json_config)
 }
 
 

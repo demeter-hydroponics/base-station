@@ -24,7 +24,7 @@ func ReadMessage(reader io.Reader, buf [1024]byte, processingChannel chan <- cor
 		return err
 	}
 	if err != nil {
-		log.Error("there was an error reading a header in", "err", err)
+		//log.Error("there was an error reading a header in", "err", err)
 		return err
 	}
 	if n != 16 {
@@ -36,7 +36,7 @@ func ReadMessage(reader io.Reader, buf [1024]byte, processingChannel chan <- cor
 	header := pb_common.MessageHeader{}
 	err = proto.Unmarshal(buf[0:16], &header)
 	if err != nil {
-		log.Error("error in unmarshalling header", "err", err)
+		//log.Error("error in unmarshalling header", "err", err)
 		return err
 	}
 	// determine the size of the message and read in the message
@@ -45,7 +45,7 @@ func ReadMessage(reader io.Reader, buf [1024]byte, processingChannel chan <- cor
 	// read in the message
 	n, err = io.ReadFull(reader, buf[0:msgSize])
 	if err != nil {
-		log.Error("there was an error reading a header in", "err", err)
+		//log.Error("there was an error reading a message in", "err", err)
 		return err
 	}
 	if uint32(n) != msgSize {
@@ -53,7 +53,7 @@ func ReadMessage(reader io.Reader, buf [1024]byte, processingChannel chan <- cor
 		return errors.New("incorrect number of bytes were read in for message")
 	}
 
-	var msg proto.Message = channelToPb(*header.Channel)
+	var msg proto.Message = ChannelToPb(*header.Channel)
     if msg == nil {
         return errors.New("header is invalid, or unsupported")
     }
@@ -64,9 +64,9 @@ func ReadMessage(reader io.Reader, buf [1024]byte, processingChannel chan <- cor
 		return err
 	}
     // put this in the processing channel
+	//log.Info("msg recieved!", "msg", msg.String())
     metric := core.PbMetric{Pb: msg, ControllerId: id, Timestamp: time.Now()}
     processingChannel <- metric
-	//log.Info("msg recieved!", "msg", msg.String())
     // TODO send this struct through to some goroutine for processing stats if its a stat
 
 	return nil
@@ -74,7 +74,7 @@ func ReadMessage(reader io.Reader, buf [1024]byte, processingChannel chan <- cor
 
 func SenderRoutine(c *websocket.Conn, toSend <-chan proto.Message, quit <-chan bool) {
 	for msg := range toSend {
-		var channel = pbToChannel(msg)
+		var channel = PbToChannel(msg)
         log.Info("recieved msg","channel", channel)
         var err error
 
@@ -133,7 +133,6 @@ func controllerHandler(w http.ResponseWriter, r *http.Request) {
     core.SenderChannels[id] = senderChannel
     core.SenderChannelsMutex.Unlock()
 
-
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Error("upgrade :", "err", err)
@@ -160,14 +159,14 @@ func controllerHandler(w http.ResponseWriter, r *http.Request) {
 			log.Error("There was an error with loading the next message:", "err", err)
 			continue
 		}
-		log.Info("Got a new frame")
+		//log.Info("Got a new frame")
 
 		// NOTE do a check on message type, this should be a Text or skip it
 		if messageType != websocket.BinaryMessage {
 			// this could be a ping/pong, a close or a text message. ignore all for now
 			_, err := io.ReadAll(reader)
 			if err != nil {
-				log.Error("there was an error clearing the reader", "err", err)
+				//log.Error("there was an error clearing the reader", "err", err)
 			}
 			log.Info("Got a non binary message", "msg type", messageType)
 			continue
@@ -176,14 +175,14 @@ func controllerHandler(w http.ResponseWriter, r *http.Request) {
         // TODO check for connection closed somewhere so you can trigger the send routine to die
 
 		for {
-			log.Info("Processing a Message")
+			//log.Info("Processing a Message")
 			err = ReadMessage(reader, buf, core.MetricsChannel, id)
 			if err != nil {
 				if err == io.EOF {
-					log.Info("EOF found, Message over")
+					//log.Info("EOF found, Message over")
 					break
 				}
-				log.Error("encountered an error in reading message", "err", err)
+				//log.Error("encountered an error in reading message", "err", err)
 			}
 		}
 

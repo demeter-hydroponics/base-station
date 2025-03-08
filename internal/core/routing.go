@@ -2,6 +2,7 @@ package core
 
 import (
 	pb_column "base-station/protobuf/generated/go/column"
+    pb_node "base-station/protobuf/generated/go/node"
 
 	//"github.com/golang/protobuf/proto"
     "errors"
@@ -48,14 +49,25 @@ func UpdatePumpState(id string, primary, secondary pb_column.PumpState) error {
 
 func UpdateMixingState(id string, state pb_column.MixingOverrideState) error {
     SenderChannelsMutex.Lock()
+    defer SenderChannelsMutex.Unlock()
     // send the command
     if channel, exists := SenderChannels[id]; exists {
         channel <- &pb_column.SetMixingStateCommand{State: &state} 
     } else {
-        SenderChannelsMutex.Unlock()
         return errors.New("Id not recognized")
     }
-    SenderChannelsMutex.Unlock()
 
+	return nil
+}
+
+func UpdatePPFD(id string, ppfd float32) error {
+    SenderChannelsMutex.Lock()
+    defer SenderChannelsMutex.Unlock()
+    // send the command
+    if channel, exists := SenderChannels[id]; exists {
+        channel <- &pb_node.SetPPFDReferenceCommand{PPFD: &ppfd} 
+    } else {
+        return errors.New("Id not recognized")
+    }
 	return nil
 }

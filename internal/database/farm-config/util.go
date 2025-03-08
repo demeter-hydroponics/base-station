@@ -11,3 +11,13 @@ I want a single function/handler to be able to update the config at once, others
 */
 var ConfigMutex sync.Mutex
 var Config pb_panel.FarmConfig 
+
+func InitFarmConfig() {
+    Config = pb_panel.FarmConfig{
+        Controllers: make(map[string]*pb_panel.ControllerConfig),
+        Columns: make([]*pb_panel.ColumnConfig, 0),
+        UnsetNodes: make([]*pb_panel.NodeConfig, 0),
+    }
+
+
+}
