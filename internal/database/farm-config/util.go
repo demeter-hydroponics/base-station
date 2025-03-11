@@ -23,7 +23,7 @@ func InitFarmConfig() {
     }
 
     column_id := "5a0c4ea4-b1c5-4c97-ae43-7e01627dc688"
-    column_name := "column"
+    column_name := "bulbasaur"
     column_type_ctrllr := pb_common.ControllerType_COLUMN
 
     Config.Controllers["5a0c4ea4-b1c5-4c97-ae43-7e01627dc688"] = &pb_panel.ControllerConfig{
@@ -33,13 +33,23 @@ func InitFarmConfig() {
     }
 
     node_id := "0a7dbbd3-d42b-4593-9135-8509c2ed520e"
-    node_name := "node"
+    node_name := "lettuce"
     node_type_ctrllr := pb_common.ControllerType_NODE
 
     Config.Controllers["0a7dbbd3-d42b-4593-9135-8509c2ed520e"] = &pb_panel.ControllerConfig{
         Id: &node_id, 
         Type: &node_type_ctrllr,
         Name: &node_name,
+    }
+    
+    node_2_id := "0a7dcbd3-d52b-4693-9235-8519c2ed521f"
+    node_2_name := "green onions"
+    node_2_type_ctrllr := pb_common.ControllerType_NODE
+
+    Config.Controllers["0a7dcbd3-d52b-4693-9235-8519c2ed521f"] = &pb_panel.ControllerConfig{
+        Id: &node_2_id, 
+        Type: &node_2_type_ctrllr,
+        Name: &node_2_name,
     }
 
     pumpState := pb_column.PumpState_PUMP_OFF
@@ -58,8 +68,13 @@ func InitFarmConfig() {
         Id: &node_id,
         PPFD: &ppfd,
     }
+    node_2 := pb_panel.NodeConfig{
+        Id: &node_2_id,
+        PPFD: &ppfd,
+    }
     
     column.Nodes = append(column.Nodes, &node)
+    column.Nodes = append(column.Nodes, &node_2)
     Config.Columns = append(Config.Columns,&column)
     DefaultConfig = Config
 }
