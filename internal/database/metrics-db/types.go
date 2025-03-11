@@ -10,7 +10,7 @@ import (
     "io"
 )
 
-var LOKI_ENDPOINT string = "http://100.123.35.94:3100/loki/api/v1/push"
+var LOKI_ENDPOINT string = "http://localhost:3100/loki/api/v1/push"
 
 type Stream struct {
 	Stream map[string]string `json:"stream"`
