@@ -17,6 +17,7 @@
       "PrimaryPumpState": 0,
       "SecondaryPumpState": 0,
       "MixingState": 2,
+      "water state"
       "Nodes": [
           {
               "Id": "0a7dbbd3-d42b-4593-9135-8509c2ed520e",

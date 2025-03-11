@@ -25,6 +25,8 @@ var upgrader = websocket.Upgrader{CheckOrigin: check_origin} // use default opti
 
 var metrics_pb chan proto.Message
 
+
+
 func Run() {
 
 	farm_config.InitFarmConfig()
@@ -34,11 +36,32 @@ func Run() {
 
 	log.Info("running server")
 	http.HandleFunc("/ws", controllerHandler)
-	http.HandleFunc("/config", configHandler)
-	http.HandleFunc("/connected", testGetConnectedHandler)
+	//http.HandleFunc("/config", configHandler)
+	http.Handle("/config", enableCORS(http.HandlerFunc(configHandler)))
+	http.Handle("/config/default", enableCORS(http.HandlerFunc(configDefaultGetHandler)))
+	http.Handle("/connected", enableCORS(http.HandlerFunc(testGetConnectedHandler)))
 	log.Info("Running server on <ip>:12345")
-	log.Info("available endpoints: /ws, /config (post), /connected")
+	log.Info("available endpoints: /ws, /config, /config/default, /connected")
 	log.Error("Error in server:", "err", http.ListenAndServe(":12345", nil))
+}
+
+// CORS middleware
+func enableCORS(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Set CORS headers
+        w.Header().Set("Access-Control-Allow-Origin", "*") // Allow any origin
+        w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        
+        // Handle preflight requests
+        if r.Method == "OPTIONS" {
+            w.WriteHeader(http.StatusOK)
+            return
+        }
+        
+        // Pass control to the next handler
+        next.ServeHTTP(w, r)
+    })
 }
 
 func PbToChannel(msg proto.Message) pb_common.MessageChannels {

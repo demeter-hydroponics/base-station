@@ -51,28 +51,28 @@ func UpdateConfig(new_config *pb_panel.FarmConfig) error {
 		log.Infof("setting controller %s", id)
 
 		// apply the pump configs
-		if UpdatePumpState(id, *column.PrimaryPumpState, *column.SecondaryPumpState) != nil {
-			log.Info("Error setting Column Pump State", "id", id)
+        if err := UpdatePumpState(id, *column.PrimaryPumpState, *column.SecondaryPumpState); err != nil {
+			log.Info("Error setting Column Pump State", "id", id, "err", err)
 		}
 		// apply the mixing configs
-		if UpdateMixingState(id, *column.MixingState) != nil {
-			log.Info("Error setting Column Mixing State", "id", id)
+        if err := UpdateMixingState(id, *column.MixingState); err != nil {
+			log.Info("Error setting Column Mixing State", "id", id, "err", err)
 		}
 		// apply the water level configs
-		if UpdateWaterlevelState(id, *column.WaterLevelState) != nil {
-			log.Info("Error setting Column water level State", "id", id)
+        if err := UpdateWaterlevelState(id, *column.WaterLevelState); err != nil {
+			log.Info("Error setting Column water level State", "id", id, "err", err)
 		}
 
 		for _, node := range column.Nodes {
-			if UpdatePPFD(node.GetId(), node.GetPPFD()) != nil {
-				log.Info("Error setting Node PPFD", "id", node.GetId())
+            if err := UpdatePPFD(node.GetId(), node.GetPPFD()); err != nil {
+				log.Info("Error setting Node PPFD", "id", node.GetId(), "err", err)
 			}
 		}
 	}
 
 	for _, node := range new_config.UnsetNodes {
-		if UpdatePPFD(node.GetId(), node.GetPPFD()) != nil {
-			log.Info("Error setting Node PPFD", "id", node.GetId())
+        if err := UpdatePPFD(node.GetId(), node.GetPPFD()); err != nil {
+			log.Info("Error setting Node PPFD", "id", node.GetId(), "err", err)
 		}
 	}
 
