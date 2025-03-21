@@ -13,6 +13,7 @@ import (
 	pb_column "base-station/protobuf/generated/go/column"
 	pb_node "base-station/protobuf/generated/go/node"
 	"encoding/json"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 )
@@ -31,7 +32,7 @@ func Run() {
 
 	farm_config.InitFarmConfig()
 
-	core.MetricsChannel = make(chan core.PbMetric, 1000)
+	core.Init()
 	go core.ProcessMetrics(core.MetricsChannel)
 
 	log.Info("running server")
@@ -40,8 +41,9 @@ func Run() {
 	http.Handle("/config", enableCORS(http.HandlerFunc(configHandler)))
 	http.Handle("/config/default", enableCORS(http.HandlerFunc(configDefaultGetHandler)))
 	http.Handle("/connected", enableCORS(http.HandlerFunc(testGetConnectedHandler)))
+	http.Handle("/tanklevels", enableCORS(http.HandlerFunc(testGetTankLevels)))
 	log.Info("Running server on <ip>:12345")
-	log.Info("available endpoints: /ws, /config, /config/default, /connected")
+	log.Info("available endpoints: /ws, /config, /config/default, /connected, /tankLevels")
 	log.Error("Error in server:", "err", http.ListenAndServe(":12345", nil))
 }
 
@@ -111,14 +113,18 @@ func OnboardController(id, controllerType string) (string, bool, error) {
 func testGetConnectedHandler(w http.ResponseWriter, r *http.Request) {
 	// get a list of connected controllers
 	log.Info("Getting connected controllers")
-	core.SenderChannelsMutex.Lock()
-	connectedControllers := make([]string, 0, len(core.SenderChannels))
+//	core.SenderChannelsMutex.Lock()
+	core.LastSeenMutex.Lock()
+	connectedControllers := make([]string, 0)
+	now := time.Now()
 
-	for k := range core.SenderChannels {
-		connectedControllers = append(connectedControllers, k)
+	for k,v := range core.LastSeen {
+		if now.Sub(v) < 2*time.Second {
+			connectedControllers = append(connectedControllers, k)
+		}
 	}
 
-	core.SenderChannelsMutex.Unlock()
+	core.LastSeenMutex.Unlock()
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -129,6 +135,32 @@ func testGetConnectedHandler(w http.ResponseWriter, r *http.Request) {
 	err := json.NewEncoder(w).Encode(connectedControllers)
 	if err != nil {
 		http.Error(w, "Error encoding response", http.StatusInternalServerError)
+		log.Error("error in sending json", "err", err)
 		return
 	}
+	log.Info("returned connected")
+}
+
+
+func testGetTankLevels(w http.ResponseWriter, r *http.Request) {
+	log.Info("Getting tank heights")
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Write status code
+	w.WriteHeader(http.StatusOK)
+
+	core.TankLevelsMutex.Lock()
+
+	// Encode and write the JSON response
+	err := json.NewEncoder(w).Encode(core.TankLevels)
+	if err != nil {
+		http.Error(w, "Error encoding response", http.StatusInternalServerError)
+		return
+	}
+
+	core.TankLevelsMutex.Unlock()
+
+
+
 }

@@ -182,6 +182,15 @@ func controllerHandler(w http.ResponseWriter, r *http.Request) {
 					//log.Info("EOF found, Message over")
 					break
 				}
+
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) || websocket.IsCloseError(err, websocket.CloseNormalClosure,websocket.CloseGoingAway) {
+					log.Info("socket has been closed by client")
+	                core.SenderChannelsMutex.Lock()
+	                delete(core.SenderChannels, id)
+	                core.SenderChannelsMutex.Unlock()
+	                senderQuitChan <- true
+					return
+				}
 				//log.Error("encountered an error in reading message", "err", err)
 			}
 		}

@@ -3,6 +3,7 @@ package core
 import (
 	//	"github.com/golang/protobuf/proto"
 	"errors"
+	"time"
 
 	metrics_db "base-station/internal/database/metrics-db"
 	"base-station/internal/utils"
@@ -10,7 +11,8 @@ import (
 	"github.com/charmbracelet/log"
 
 	farm_config "base-station/internal/database/farm-config"
-	pb_node "base-station/protobuf/generated/go/node"
+//	pb_node "base-station/protobuf/generated/go/node"
+	pb_column "base-station/protobuf/generated/go/column"
 	pb_panel "base-station/protobuf/generated/go/panel"
 )
 
@@ -18,6 +20,11 @@ func ProcessMetrics(metrics_pb <-chan PbMetric) {
 	log.Info("Starting Metrics Processing Goroutine")
 
 	for msg := range metrics_pb {
+		// register the lastSeen 
+		LastSeenMutex.Lock()
+		LastSeen[msg.ControllerId] = time.Now()
+		LastSeenMutex.Unlock()
+
 		payload, err := utils.ProtoToJSON(msg.Pb)
 		if err != nil {
 			log.Error("there was an error in marshalling the protobuff", "err", err)
@@ -25,8 +32,18 @@ func ProcessMetrics(metrics_pb <-chan PbMetric) {
 		}
 		log.Info("incoming data", "msg", msg.Pb.String())
 		go metrics_db.SendMetric(msg.ControllerId, string(payload))
-		if pb, ok := msg.Pb.(*pb_node.GrowLightSectionStats); ok {
-			log.Info("recieved grow section stats", "msg", pb.String())
+
+//		if pb, ok := msg.Pb.(*pb_node.GrowLightSectionStats); ok {
+//			log.Info("recieved grow section stats", "msg", pb.String())
+//		}
+		if pb, ok := msg.Pb.(*pb_column.PumpTankStats); ok {
+			TankLevelsMutex.Lock()
+			// extract the relevant info
+			// grab the solution reservoir levels
+			TankLevels["solution"][msg.ControllerId] = 0.18 - *pb.SolutionReservoirLevel.TankFluidVolume_L
+			// grab the mixing reservoir levels
+			TankLevels["mixing"][msg.ControllerId] = 0.12 - *pb.MixingReservoirLevel.TankFluidVolume_L
+			TankLevelsMutex.Unlock()
 		}
 
 	}
