@@ -1,0 +1,30 @@
+{
+  "Controllers": {
+    "5a0c4ea4-b1c5-4c97-ae43-7e01627dc688": {
+      "Id": "5a0c4ea4-b1c5-4c97-ae43-7e01627dc688",
+      "Type": 1,
+      "Name": "column"
+    }
+    "0a7dbbd3-d42b-4593-9135-8509c2ed520e": {
+      "Id": "0a7dbbd3-d42b-4593-9135-8509c2ed520e",
+      "Type": 0,
+      "Name": "node"
+    }
+  },
+  "Columns": [
+    {
+      "Id": "5a0c4ea4-b1c5-4c97-ae43-7e01627dc688",
+      "PrimaryPumpState": 0,
+      "SecondaryPumpState": 0,
+      "MixingState": 2,
+      "water state"
+      "Nodes": [
+          {
+              "Id": "0a7dbbd3-d42b-4593-9135-8509c2ed520e",
+              "PPFD": 0.0,
+          }
+      ]
+    }
+  ],
+  "UnsetNodes": []
+}

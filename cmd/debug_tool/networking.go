@@ -125,6 +125,7 @@ func SenderRoutine(c *websocket.Conn) {
 				"COULD NOT MARSHAL TO PROTO" +
 				err.Error()
 			prog.Send(MessageCmd(string_msg))
+            panic(err)
 			continue
 		}
 		// convert protobuf to bytes
@@ -134,6 +135,7 @@ func SenderRoutine(c *websocket.Conn) {
 				"COULD NOT MARSHAL TO BYTES" +
 				err.Error()
 			prog.Send(MessageCmd(string_msg))
+            panic(err)
 			continue
 		}
 		// make the header
@@ -151,6 +153,7 @@ func SenderRoutine(c *websocket.Conn) {
 				"COULD NOT MARSHAL HEADER TO BYTES" +
 				err.Error()
 			prog.Send(MessageCmd(string_msg))
+            panic(err)
 			continue
 		}
 		if err := c.WriteMessage(websocket.BinaryMessage, append(header_bytes, pb_bytes...)); err != nil {
@@ -164,6 +167,7 @@ func SenderRoutine(c *websocket.Conn) {
 				string_msg = "ERR =======================\n" +
 					"COULD NOT WRITE OUTGOING MESSAGE" +
 					err.Error()
+                panic(err)
 			}
 			prog.Send(MessageCmd(string_msg))
 			continue
@@ -191,6 +195,8 @@ func MockServer(w http.ResponseWriter, r *http.Request) {
 	}
 	defer c.Close()
 
+	prog.Send(MessageCmd("device connected!\n"))
+
 	log.Info("recieved websocket connection")
 	go SenderRoutine(c)
 	// create a buffer for the header message
@@ -209,7 +215,7 @@ func MockServer(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Info("Got a new frame")
 
-		if messageType != websocket.TextMessage {
+		if messageType != websocket.BinaryMessage {
 			// this could be a ping/pong, a close or a text message. ignore all for now
 			_, err := io.ReadAll(reader)
 			if err != nil {
@@ -220,12 +226,16 @@ func MockServer(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for {
+
+	    //prog.Send(MessageCmd("processing a message"))
 			// TODO check for EOF error and break out of this loop
 			log.Info("Processing a Message")
 			err = ProcessMessage(reader, buf)
 			if err != nil {
+	            prog.Send(MessageCmd("error in reading message"))
 				if err == io.EOF {
 					log.Info("EOF found, Message over")
+	                prog.Send(MessageCmd("EOF"))
 					break
 				}
 				log.Error("encountered an error in reading message", "err", err)
